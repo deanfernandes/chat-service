@@ -10,31 +10,31 @@ const usePingServer = (serverAddress: string): boolean => {
     const connectAndPingServer = () => {
       if (ws.current?.readyState === WebSocket.OPEN) {
         ws.current?.send("ping");
-
         startPongTimeout();
       } else {
         ws.current = new WebSocket(`ws://${serverAddress}`);
 
         ws.current.onopen = () => {
           ws.current?.send("ping");
-
           startPongTimeout();
         };
 
         ws.current.onmessage = (e) => {
           if (e.data === "pong") {
             clearPongTimeout();
-
             setCanConnect(true);
           }
         };
 
         ws.current.onerror = () => {
           clearPongTimeout();
-
           setCanConnect(false);
-
           ws.current?.close();
+          ws.current = null;
+        };
+
+        ws.current.onclose = () => {
+          setCanConnect(false);
           ws.current = null;
         };
       }

@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import usePingServer from "./hooks/usePingServer";
+import useConnectServer from "./hooks/useConnectServer";
 
 interface ChatComponentProps {
   serverAddress: string;
@@ -11,67 +12,165 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
   username,
 }) => {
   const canConnect = usePingServer(serverAddress);
-  const [connected, setConnected] = useState<boolean>(false);
-  const ws = useRef<WebSocket | null>(null);
+  const { connected, messages, sendMessage, connect, disconnect } =
+    useConnectServer(serverAddress, username, canConnect);
+
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const handleConnect = () => {
-    ws.current = new WebSocket(`ws://${serverAddress}?username=${username}`);
-
-    ws.current.onopen = () => {
-      setConnected(true);
-    };
-
-    ws.current.onerror = () => {
-      ws.current?.close();
-      ws.current = null;
-    };
-
-    ws.current.onclose = () => {
-      setConnected(false);
-    };
-  };
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = () => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(message);
-
-      setMessages((prev) => [...prev, username + ": " + message]);
-
+    if (message.trim() !== "") {
+      sendMessage(message);
       setMessage("");
     }
   };
 
   return (
-    <div style={{ backgroundColor: "lightgray" }}>
+    <div
+      style={{
+        backgroundColor: "#f2f2f2",
+        borderRadius: "8px",
+        padding: "20px",
+        width: connected ? "400px" : "fit-content",
+        fontFamily: "Arial, sans-serif",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       {!connected ? (
         <>
-          <button disabled={!canConnect} onClick={handleConnect}>
-            Connect
+          <button
+            onClick={connect}
+            disabled={!canConnect}
+            style={{
+              padding: "10px 20px",
+              fontSize: "16px",
+              backgroundColor: canConnect ? "#0078D4" : "#a0a0a0",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: canConnect ? "pointer" : "not-allowed",
+              transition: "background-color 0.3s ease",
+            }}
+          >
+            {canConnect ? "Connect to Chat" : "Connecting..."}
           </button>
-          {!canConnect && <p>Sorry, chat service is down. Try again later.</p>}
+          {!canConnect && (
+            <p
+              style={{
+                color: "red",
+                fontSize: "14px",
+                marginTop: "10px",
+              }}
+            >
+              Sorry, the chat service is down. Try again later.
+            </p>
+          )}
         </>
       ) : (
         <>
           <div
             style={{
-              maxHeight: "100px",
+              display: "flex",
+              flexDirection: "column",
+              height: "200px",
               overflowY: "auto",
-              textAlign: "left",
+              backgroundColor: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              padding: "10px",
+              marginBottom: "10px",
+              width: "100%",
             }}
           >
-            {messages.map((msg, index) => (
-              <div key={index}>{msg}</div>
-            ))}
+            {messages.length === 0 ? (
+              <div style={{ color: "#888", fontStyle: "italic" }}>
+                No messages yet.
+              </div>
+            ) : (
+              messages.map((msg, index) => (
+                <div
+                  key={index}
+                  style={{
+                    marginBottom: "6px",
+                    padding: "6px 8px",
+                    backgroundColor: "#f1f1f1",
+                    borderRadius: "4px",
+                    alignSelf: "flex-start",
+                    maxWidth: "80%",
+                  }}
+                >
+                  {msg}
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
           </div>
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your message..."
-          />
-          <button onClick={handleSend}>Send</button>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              width: "100%",
+            }}
+          >
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Type your message..."
+              style={{
+                flex: 1,
+                padding: "10px",
+                border: "1px solid #ccc",
+                borderRadius: "4px",
+                fontSize: "14px",
+              }}
+            />
+            <button
+              onClick={handleSend}
+              style={{
+                padding: "10px 16px",
+                fontSize: "14px",
+                backgroundColor: "#0078D4",
+                color: "#fff",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+              }}
+            >
+              Send
+            </button>
+          </div>
+
+          <button
+            onClick={disconnect}
+            style={{
+              marginTop: "10px",
+              padding: "6px 12px",
+              fontSize: "12px",
+              backgroundColor: "#d13438",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Disconnect
+          </button>
         </>
       )}
     </div>
